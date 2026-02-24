@@ -1,0 +1,18 @@
+{
+  "name": "ecfr-backend",
+  "version": "1.0.0",
+  "description": "backend for the eCFR take home exam for DOGE. Uses a modern PostGreSQL Express JS React Node Js (PERN) stack for a modern user experience.",
+  "license": "ISC",
+  "author": "Mohammad Hamza Khan mohammadkhan96@live.com",
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "pg": "^8.18.0"
+  }
+}
