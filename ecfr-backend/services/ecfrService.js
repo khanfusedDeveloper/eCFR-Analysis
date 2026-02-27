@@ -1,4 +1,7 @@
 //gets api data from eCFR api
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
+
 const pool = require('../db');
 const crypto = require('crypto');
 
@@ -6,16 +9,13 @@ const ECFR_BASE_URL = 'https://www.ecfr.gov';
 
 //simply gets the JSON from the api get request
 const fetchRawAgencies = async () => {
-
     console.log("Getting agencies JSON from eCFR...");
     const response = await fetch(`${ECFR_BASE_URL}/api/admin/v1/agencies.json`);
-if (!response.ok){
-    throw new Error(`Something went wrong fetching agencies: , ${response.statusText}`);
-}
-
+    if (!response.ok){
+        throw new Error(`Something went wrong fetching agencies: , ${response.statusText}`);
+    }
 
     const data = await response.json();
-    console.log(data.agencies);
     return data.agencies;
 };
 
@@ -31,7 +31,7 @@ const flattenAgencies = (rawAgencies) => {
             short_name: element.short_name,
             parent_slug: null,
             cfr_references: JSON.stringify(element.cfr_references || [])
-    });
+        });
 
         if (element.children && element.children.length > 0){
             element.children.forEach(childrenElement => {
@@ -49,7 +49,6 @@ const flattenAgencies = (rawAgencies) => {
     return flatList;
 }
 
-
 const saveAgenciesToDB = async (flattenAgenciesList) => {
     console.log(`saving ${flattenAgenciesList.length} to db agencies table`);
     const client = await pool.connect();
@@ -58,7 +57,6 @@ const saveAgenciesToDB = async (flattenAgenciesList) => {
         await client.query('BEGIN');
 
         for (const agency of flattenAgenciesList) {
-
             await client.query(`INSERT INTO agencies
                 VALUES ($1, $2, $3, $4, $5)
                 ON CONFLICT (slug) DO UPDATE
@@ -66,28 +64,22 @@ const saveAgenciesToDB = async (flattenAgenciesList) => {
                     short_name = EXCLUDED.short_name,
                     cfr_references = EXCLUDED.cfr_references;
                 `, [agency.slug, agency.name, agency.short_name, agency.parent_slug, agency.cfr_references])
-            }
+        }
 
         await client.query('COMMIT');
         console.log('Saved the agencies to the DB!')
     }
-
     catch(error){
         console.error(`Ran into error while writing to agencies TABLE in DATABASE ecfr_db ${error}.. ROLLING BACK`);
         await client.query('ROLLBACK');
         throw error;
-
     }
-
     finally{
         client.release();
     }
 };
 
-
 const syncAgencies = async () => {
-
-
     try{
         const rawAgencies = await fetchRawAgencies();
         const FlattendAgenciesList = flattenAgencies(rawAgencies);
@@ -98,7 +90,6 @@ const syncAgencies = async () => {
         throw error;
     }
 };
-
 
 const getPartsForChapter = async (date, title, chapter) => {
     try {
@@ -129,8 +120,6 @@ const getPartsForChapter = async (date, title, chapter) => {
     }
 };
 
-
-
 const getPartText = async (date, title, part) => {
     try {
         const res = await fetch(`https://www.ecfr.gov/api/versioner/v1/full/${date}/title-${title}.xml?part=${part}`);
@@ -143,7 +132,6 @@ const getPartText = async (date, title, part) => {
         return "";
     }
 };
-
 
 const getValidDateForTitle = async (title) => {
     let d = new Date();
@@ -215,7 +203,7 @@ const processAgencyMetrics = async () => {
                     restrictive_word_count = EXCLUDED.restrictive_word_count;
             `, [agency.slug, wordCount, checksum, restrictiveCount]);
             
-            console.log(`✅ Saved metrics | Words: ${wordCount} | Restrictive: ${restrictiveCount}`);
+            console.log(`Saved metrics | Words: ${wordCount} | Restrictive: ${restrictiveCount}`);
         }
         
         console.log("\nFinished processing agency metrics!");
@@ -232,5 +220,17 @@ module.exports = {
     processAgencyMetrics
 };
 
-processAgencyMetrics().then(() => pool.end());
+const runPipeline = async () => {
+    try {
+        console.log("Starting full data pipeline...");
+        await syncAgencies();
+        await processAgencyMetrics();
+        console.log("\nPipeline complete!");
+    } catch (err) {
+        console.error("\n Pipeline failed:", err);
+    } finally {
+        await pool.end();
+    }
+};
 
+runPipeline();
