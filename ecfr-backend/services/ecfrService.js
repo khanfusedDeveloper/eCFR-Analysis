@@ -187,7 +187,7 @@ const processAgencyMetrics = async () => {
                 const parts = await getPartsForChapter(validDate, ref.title, ref.chapter);
                 console.log(`Found ${parts.length} parts for Chapter ${ref.chapter}`);
                 
-                for (const part of parts.slice(0, 2)) { 
+                for (const part of parts) { 
                     const text = await getPartText(validDate, ref.title, part);
                     totalText += text + " ";
                 }
